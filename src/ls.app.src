@@ -1,0 +1,13 @@
+{application, ls,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  ofs_handler
+                 ]},
+  {mod, { ls_app, []}},
+  {env, []}
+ ]}.

@@ -1,0 +1,5 @@
+/rel/ls
+/ebin/
+/.rebar/
+/deps/
+erl_crash.dump
