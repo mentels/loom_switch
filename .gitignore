@@ -3,3 +3,5 @@
 /.rebar/
 /deps/
 erl_crash.dump
+*.beam
+

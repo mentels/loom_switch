@@ -110,7 +110,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 
 learn_src_mac_to_port(Msg, FwdTable0) ->
-    InPort = proplists:get_value(in_port, Msg),
+    InPort = proplists:get_value(in_port, proplists:get_value(match, Msg)),
     <<_DstMac:6/bytes, SrcMac:6/bytes, _/binary>> = proplists:get_value(data, Msg),
     maps:put(SrcMac, InPort, FwdTable0).
 
