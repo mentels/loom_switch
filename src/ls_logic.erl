@@ -6,7 +6,9 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0,
+-export([start/0,
+         start_link/0,
+         stop/0,
          init_main_connection/1,
          handle_packet_in/2,
          get_forwarding_table/1,
@@ -34,8 +36,14 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
+start() ->
+    gen_server:start({local, ?SERVER}, ?MODULE, [], []).
+
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+stop() ->
+    gen_server:call(?SERVER, stop).
 
 init_main_connection(DatapathId) ->
     gen_server:cast(?SERVER, {init_main_connection, DatapathId}),
@@ -66,6 +74,10 @@ handle_call({get_forwarding_table, DatapathId}, _From,
         {ok, _FwdTable} = Reply ->
             {reply, Reply, State}
         end;
+handle_call(stop, _From, #state{switches = Switches} = State) ->
+    [ofs_handler:unsubscribe(DpId, ls_ofsh, packet_in)
+     || DpId <- maps:keys(Switches)],
+    {stop, normal, ok, State};
 handle_call(_Msg, _From, State) ->
     {reply, ok, State}.
 
