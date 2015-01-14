@@ -96,13 +96,13 @@ handle_cast({handle_packet_in, DatapathId, Msg},
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1  = learn_src_mac_to_port(Msg, FwdTable0),
     lager:debug("DPID ~p: added entry to fwd table: ~p", [FwdTable1]),
-    %% OutPort = case get_port_for_dst_mac(Msg, FwdTable0) of
-    %%               undefined ->
-    %%                   flood;
-    %%               PortNo ->
-    %%                   install_flow_to_dst_mac(Msg, PortNo, DatapathId),
-    %%                   PortNo
-    %% end,
+    OutPort = case get_port_for_dst_mac(Msg, FwdTable0) of
+                  undefined ->
+                      flood;
+                  PortNo ->
+                      install_flow_to_dst_mac(Msg, PortNo, DatapathId),
+                      PortNo
+    end,
     %% send_packet_out(Msg, OutPort, DatapathId),
     %% lager:debug("DPID ~p: sent packet out through ~p~n", [DatapathId, OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
@@ -135,8 +135,17 @@ get_port_for_dst_mac(Msg, FwdTable) ->
             Port
     end.
 
-install_flow_to_dst_mac(Msg, PortNo, DatapathId) ->
-    ok.
+install_flow_to_dst_mac(Msg, OutPort, DatapathId) ->
+    InPort = proplists:get_value(in_port, proplists:get_value(match, Msg)),
+    <<DstMac:6/bytes, _/binary>> = proplists:get_value(data, Msg),
+    Matches = [{in_port, InPort}, {eth_dst, DstMac}],
+    Instructions = [{apply_actions, [{output, OutPort, no_buffer}]}],
+    Opts = [{table_id,0}, {priority, 100},
+            {idle_timeout, 0}, {idle_timeout, 0},
+            {cookie, <<0,0,0,0,0,0,0,10>>},
+            {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
+    FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
+    ok = ofs_handler:send(DatapathId, FlowMod).
 
 send_packet_out(Msg, PortNo, DatapathId) ->
     ok.
