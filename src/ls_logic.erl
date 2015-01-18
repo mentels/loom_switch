@@ -103,8 +103,8 @@ handle_cast({handle_packet_in, DatapathId, Msg},
                       install_flow_to_dst_mac(Msg, PortNo, DatapathId),
                       PortNo
     end,
-    %% send_packet_out(Msg, OutPort, DatapathId),
-    %% lager:debug("DPID ~p: sent packet out through ~p~n", [DatapathId, OutPort]),
+    send_packet_out(Msg, OutPort, DatapathId),
+    lager:debug("DPID ~p: sent packet out through ~p~n", [DatapathId, OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
     {noreply, State#state{switches = Switches1}}.
 
@@ -147,8 +147,12 @@ install_flow_to_dst_mac(Msg, OutPort, DatapathId) ->
     FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
     ok = ofs_handler:send(DatapathId, FlowMod).
 
-send_packet_out(Msg, PortNo, DatapathId) ->
-    ok.
+send_packet_out(Msg, OutPort, DatapathId) ->
+    InPort = proplists:get_value(in_port, proplists:get_value(match, Msg)),
+    Actions = [{output, OutPort, no_buffer}],
+    BufferId = proplists:get_value(buffer_id, Msg),
+    PacketOut = of_msg_lib:send_packet(4, BufferId, InPort, Actions),
+    ok = ofs_handler:send(DatapathId, PacketOut).
     
     
 
