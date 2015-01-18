@@ -29,7 +29,7 @@ end_per_suite(_Config) ->
 should_update_fwd_table(_Config) ->
     %% GIVEN
     Packet = ?PACKET(?MAC(100), (SrcMac = ?MAC(200))),
-    PacketIn = packet_in(Packet, InPort = <<0,0,0,1>>),
+    PacketIn = packet_in(Packet, InPort = 1),
 
     %% WHEN
     ok = ls_logic:handle_packet_in(?DPID, PacketIn),
@@ -40,7 +40,7 @@ should_update_fwd_table(_Config) ->
 
 should_flood_if_dst_port_unknown(_Config) ->
     %% GIVEN
-    PacketIn = packet_in(?PACKET(?MAC(100), ?MAC(150)), InPort = <<0,0,0,1>>),
+    PacketIn = packet_in(?PACKET(?MAC(100), ?MAC(150)), InPort = 1),
     
     %% GIVEN
     ls_logic:handle_packet_in(?DPID, PacketIn),
@@ -55,12 +55,12 @@ should_install_flow_and_forward_if_dst_port_known(_Config) ->
     learn_mac_to_port(LearnedMac = ?MAC(100), LearnedPort = 1),
         
     %% WHEN
-    PacketIn = packet_in(?PACKET(LearnedMac, ?MAC(150)), InPort = <<0,0,0,2>>),
+    PacketIn = packet_in(?PACKET(LearnedMac, ?MAC(150)), InPort = 2),
     ls_logic:handle_packet_in(?DPID, PacketIn),
 
     %% THEN
     Matches = [{in_port, InPort}, {eth_dst, LearnedMac}],
-    Instructions = [{apply_actions, [{output, <<LearnedPort:32>>, no_buffer}]}],
+    Instructions = [{apply_actions, [{output, LearnedPort, no_buffer}]}],
     Opts = [{table_id,0}, {priority, 100},
             {idle_timeout, 0}, {idle_timeout, 0},
             {cookie, <<0,0,0,0,0,0,0,10>>},
@@ -68,13 +68,13 @@ should_install_flow_and_forward_if_dst_port_known(_Config) ->
     ExpectedFlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
     meck:wait(1, ofs_handler, send, [?DPID, ExpectedFlowMod], 2000),
 
-    Actions = [{output, <<LearnedPort:32>>, no_buffer}],
+    Actions = [{output, LearnedPort, no_buffer}],
     ExpectedPacketOut = of_msg_lib:send_packet(4, ?BUFFER_ID, InPort, Actions),
     meck:wait(1, ofs_handler, send, [?DPID, ExpectedPacketOut], 2000).
 
 
 learn_mac_to_port(Mac, Port) ->
-    PacketIn = packet_in(?PACKET(?MAC(200), Mac), <<Port:32>>),
+    PacketIn = packet_in(?PACKET(?MAC(200), Mac), Port),
     ok = ls_logic:handle_packet_in(?DPID, PacketIn).
 
 init_ls_logic(DpId) ->
@@ -96,5 +96,5 @@ packet_in(Packet, InPort) ->
      {reason,no_match},
      {table_id,0},
      {cookie,<<0,0,0,0,0,0,0,0>>},
-     {match,[{in_port,InPort}]},
+     {match,[{in_port,<<InPort:32>>}]},
      {data, Packet}].
