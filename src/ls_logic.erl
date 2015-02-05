@@ -88,26 +88,33 @@ handle_cast({init_main_connection, DatapathId},
     {noreply, State#state{switches = Swtiches1}};
 handle_cast({terminate_main_connection, DatapathId},
             #state{switches = Switches0} = State) ->
-    ok = ofs_handler:unsubscribe(DatapathId, ls_ofsh, packet_in),
+    case ofs_handler:unsubscribe(DatapathId, ls_ofsh, packet_in) of
+        ok ->
+            ok;
+        no_handler ->
+            lager:debug("[~p] ofs_handler died before unsubscribing packet_in",
+                        [DatapathId])
+    end,
     Swtiches1 = maps:remove(DatapathId, Switches0),
     {noreply, State#state{switches = Swtiches1}};
 handle_cast({handle_packet_in, DatapathId, PacketIn},
             #state{switches = Switches0} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1  = learn_src_mac_to_port(PacketIn, FwdTable0),
-    lager:debug("[~p] Added entry to fwd table: ~p -> ~p ~n",
+    lager:debug("[~p][pkt_in] Added entry to fwd table: ~p -> ~p ~n",
                 [DatapathId, packet_in_extract(src_mac, PacketIn),
                  packet_in_extract(in_port, PacketIn)]),
     OutPort = case get_port_for_dst_mac(PacketIn, FwdTable0) of
                   undefined ->
                       flood;
                   PortNo ->
+                      lager:debug("[~p][flow] Sent flow mod", [DatapathId]),
                       install_flow_to_dst_mac(PacketIn, PortNo, DatapathId),
                       PortNo
     end,
     send_packet_out(PacketIn, OutPort, DatapathId),
-    lager:debug("[~p] Sent packet out through port: ~p~n", [DatapathId,
-                                                            OutPort]),
+    lager:debug("[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
+                                                                     OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
     {noreply, State#state{switches = Switches1}}.
 
