@@ -47,7 +47,7 @@ stop() ->
 
 init_main_connection(DatapathId) ->
     gen_server:cast(?SERVER, {init_main_connection, DatapathId}),
-    lager:info("[~p] Initialized main connection", [DatapathId]).
+    lager:info([{ls, x}], "[~p] Initialized main connection", [DatapathId]).
 
 handle_packet_in(DatapathId, PacketIn) ->
     gen_server:cast(?SERVER, {handle_packet_in, DatapathId, PacketIn}).
@@ -57,13 +57,14 @@ get_forwarding_table(DatapathId) ->
 
 terminate_main_connection(DatapathId) ->
     gen_server:cast(?SERVER, {terminate_main_connection, DatapathId}),
-    lager:info("[~p] Terminated main connection", [DatapathId]).
+    lager:info([{ls, x}], "[~p] Terminated main connection", [DatapathId]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
 init([]) ->
+    lager:debug([{ls, x}], "Initialized loow switch logic"),
     {ok, #state{}}.
 
 handle_call({get_forwarding_table, DatapathId}, _From,
@@ -92,7 +93,7 @@ handle_cast({terminate_main_connection, DatapathId},
         ok ->
             ok;
         no_handler ->
-            lager:debug("[~p] ofs_handler died before unsubscribing packet_in",
+            lager:debug([{ls, x}], "[~p] ofs_handler died before unsubscribing packet_in",
                         [DatapathId])
     end,
     Swtiches1 = maps:remove(DatapathId, Switches0),
@@ -100,20 +101,17 @@ handle_cast({terminate_main_connection, DatapathId},
 handle_cast({handle_packet_in, DatapathId, PacketIn},
             #state{switches = Switches0} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
-    FwdTable1  = learn_src_mac_to_port(PacketIn, FwdTable0),
-    lager:debug("[~p][pkt_in] Added entry to fwd table: ~p -> ~p ~n",
-                [DatapathId, packet_in_extract(src_mac, PacketIn),
-                 packet_in_extract(in_port, PacketIn)]),
+    FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
     OutPort = case get_port_for_dst_mac(PacketIn, FwdTable0) of
                   undefined ->
                       flood;
                   PortNo ->
-                      lager:debug("[~p][flow] Sent flow mod", [DatapathId]),
+                      lager:debug([{ls, x}], "[~p][flow] Sent flow mod", [DatapathId]),
                       install_flow_to_dst_mac(PacketIn, PortNo, DatapathId),
                       PortNo
     end,
     send_packet_out(PacketIn, OutPort, DatapathId),
-    lager:debug("[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
+    lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
                                                                      OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
     {noreply, State#state{switches = Switches1}}.
@@ -131,7 +129,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
-learn_src_mac_to_port(PacketIn, FwdTable0) ->
+learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0) ->
     [InPort, SrcMac] = packet_in_extract([in_port, src_mac], PacketIn),
     maps:put(SrcMac, InPort, FwdTable0).
 
@@ -174,3 +172,7 @@ packet_in_extract(in_port, PacketIn) ->
     InPort;
 packet_in_extract(buffer_id, PacketIn) ->
     proplists:get_value(buffer_id, PacketIn).
+
+format_mac(MacBin) ->
+    Mac0 = [":" ++ integer_to_list(X, 16) || <<X>> <= MacBin],
+    tl(lists:flatten(Mac0)).
