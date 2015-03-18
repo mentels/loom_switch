@@ -12,6 +12,7 @@
          init_main_connection/1,
          handle_packet_in/2,
          get_forwarding_table/1,
+         clear_forwarding_table/1,
          terminate_main_connection/1]).
 
 %% ------------------------------------------------------------------
@@ -54,6 +55,9 @@ handle_packet_in(DatapathId, PacketIn) ->
 
 get_forwarding_table(DatapathId) ->
     gen_server:call(?SERVER, {get_forwarding_table, DatapathId}).
+
+clear_forwarding_table(DatapathId) ->
+    gen_server:cast(?SERVER, {clear_forwarding_table, DatapathId}).
 
 terminate_main_connection(DatapathId) ->
     gen_server:cast(?SERVER, {terminate_main_connection, DatapathId}),
@@ -114,7 +118,20 @@ handle_cast({handle_packet_in, DatapathId, PacketIn},
     lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
                                                                      OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
-    {noreply, State#state{switches = Switches1}}.
+    {noreply, State#state{switches = Switches1}};
+handle_cast({clear_forwarding_table, DatapathId},
+            #state{switches = Switches} = State) ->
+    case maps:find(DatapathId, Switches) of
+        error ->
+            lager:debug([{ls, x}], "[~p][clear_fwd_t] Failure: not connected~n",
+                        [DatapathId]),
+            {noreply, State};
+        {ok, _FwdTable}  ->
+            lager:debug([{ls, x}], "[~p][clear_fwd_t] Cleared ~n",
+                        [DatapathId]),
+            {noreply,
+             State#state{switches = maps:put(DatapathId, #{}, Switches)}}
+    end.
 
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -131,7 +148,16 @@ code_change(_OldVsn, State, _Extra) ->
 
 learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0) ->
     [InPort, SrcMac] = packet_in_extract([in_port, src_mac], PacketIn),
-    maps:put(SrcMac, InPort, FwdTable0).
+    case maps:get(SrcMac, FwdTable0, undefined) of
+        InPort ->
+            FwdTable0;
+        _ ->
+            FwdTable1 = maps:put(SrcMac, InPort, FwdTable0),
+            lager:debug([{ls, x}], "[~p][pkt_in] Added entry to fwd table: ~p -> ~p ~n",
+                        [DatapathId, format_mac(SrcMac), InPort]),
+            FwdTable1
+    end.
+
 
 get_port_for_dst_mac(PacketIn, FwdTable) ->
     DstMac = packet_in_extract(dst_mac, PacketIn),
