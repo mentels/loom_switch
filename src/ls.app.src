@@ -6,7 +6,8 @@
   {applications, [
                   kernel,
                   stdlib,
-                  ofs_handler
+                  ofs_handler,
+                  exometer
                  ]},
   {mod, { ls_app, []}},
   {env, []}

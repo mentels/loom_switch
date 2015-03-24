@@ -29,7 +29,6 @@
 -type fwd_table() :: #{MacAddr :: string() => SwitchPort :: integer()}.
 -type switches() :: #{DatapathId :: string() => ForwardingTable :: fwd_table()}.
 -record(state, {switches = #{} :: switches()}).
--type state() :: #state{}.
 
 -include_lib("of_protocol/include/of_protocol.hrl").
 
@@ -51,6 +50,7 @@ init_main_connection(DatapathId) ->
     lager:info([{ls, x}], "[~p] Initialized main connection", [DatapathId]).
 
 handle_packet_in(DatapathId, PacketIn) ->
+    exometer:update([packet_in], 1),
     gen_server:cast(?SERVER, {handle_packet_in, DatapathId, PacketIn}).
 
 get_forwarding_table(DatapathId) ->
@@ -68,7 +68,8 @@ terminate_main_connection(DatapathId) ->
 %% ------------------------------------------------------------------
 
 init([]) ->
-    lager:debug([{ls, x}], "Initialized loow switch logic"),
+    init_exometer(),
+    lager:debug([{ls, x}], "Initialized loom switch logic"),
     {ok, #state{}}.
 
 handle_call({get_forwarding_table, DatapathId}, _From,
@@ -177,12 +178,14 @@ install_flow_to_dst_mac(PacketIn, OutPort, DatapathId) ->
             {cookie, <<0,0,0,0,0,0,0,10>>},
             {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
     FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
+    ok = exometer:update([flow_mod], 1),
     ok = ofs_handler:send(DatapathId, FlowMod).
 
 send_packet_out(PacketIn, OutPort, DatapathId) ->
     [InPort, BufferId] = packet_in_extract([in_port, buffer_id], PacketIn),
     Actions = [{output, OutPort, no_buffer}],
     PacketOut = of_msg_lib:send_packet(4, BufferId, InPort, Actions),
+    ok = exometer:update([packet_out], 1),
     ofs_handler:send(DatapathId, PacketOut).
 
 packet_in_extract(Elements, PacketIn) when is_list(Elements) ->
@@ -202,3 +205,10 @@ packet_in_extract(buffer_id, PacketIn) ->
 format_mac(MacBin) ->
     Mac0 = [":" ++ integer_to_list(X, 16) || <<X>> <= MacBin],
     tl(lists:flatten(Mac0)).
+
+init_exometer() ->
+    [ok = exometer:new([T], spiral, [{time_span, 5000}])
+     || T <- [flow_mod, packet_in, packet_out]],
+    ok = exometer_report:add_reporter(exometer_report_lager, []),
+    ok = exometer_report:subscribe(
+           exometer_report_lager, [packet_in], [one, count], 5200).
