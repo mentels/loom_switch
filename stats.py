@@ -1,17 +1,13 @@
 log_file = 'log/notice.log'
-one_file = 'log/packet_in_one.metrics'
-count_file = 'log/packet_in_count.metrics'
+count_file = 'log/packet_in.metrics'
 
-with open(log_file) as f, open(one_file, 'w') as one, open(count_file, 'w') as count:
+with open(log_file) as f, open(count_file, 'w') as count:
+    prev_count = 0
     for line in f:
-        if 'packet_in_one' in line:
+        if 'packet_in_count' in line:
             splitted = line.split()
-            time = splitted[1]
-            value = splitted[5].split(":")[1]
-            one.write('%s %s\n' % (time, value))
-        elif 'packet_in_count' in line:
-            splitted = line.split()
-            time = splitted[1]
-            value = splitted[5].split(":")[1]
-            count.write('%s %s\n' % (time, value))
-
+            time = splitted[1].split('.')[0]
+            count_value = int(splitted[5].split(":")[1])
+            calc_one_value = count_value - prev_count
+            prev_count = count_value
+            count.write('%s %d %d \n' % (time, count_value, calc_one_value))
