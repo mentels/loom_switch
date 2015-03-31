@@ -4,4 +4,7 @@
 /deps/
 erl_crash.dump
 *.beam
+log/
+*.metrics
+*.png
 

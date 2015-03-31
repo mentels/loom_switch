@@ -9,3 +9,7 @@ dev:
 
 test:
 	ct_run -dir tests -logdir logs -pa ebin -pa deps/*/ebin
+
+plot:
+	python scripts/exo_lager_to_gnuplot.py
+	gnuplot scripts/plot.plg
