@@ -51,7 +51,7 @@ init_main_connection(DatapathId) ->
 
 handle_packet_in(DatapathId, PacketIn) ->
     exometer:update([packet_in], 1),
-    gen_server:cast(?SERVER, {handle_packet_in, DatapathId, PacketIn}).
+    gen_server:cast(?SERVER, {handle_packet_in, DatapathId, PacketIn, erlang:now()}).
 
 get_forwarding_table(DatapathId) ->
     gen_server:call(?SERVER, {get_forwarding_table, DatapathId}).
@@ -103,7 +103,7 @@ handle_cast({terminate_main_connection, DatapathId},
     end,
     Swtiches1 = maps:remove(DatapathId, Switches0),
     {noreply, State#state{switches = Swtiches1}};
-handle_cast({handle_packet_in, DatapathId, PacketIn},
+handle_cast({handle_packet_in, DatapathId, PacketIn, Now0},
             #state{switches = Switches0} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
@@ -111,13 +111,14 @@ handle_cast({handle_packet_in, DatapathId, PacketIn},
                   undefined ->
                       flood;
                   PortNo ->
-                      lager:debug([{ls, x}], "[~p][flow] Sent flow mod", [DatapathId]),
                       install_flow_to_dst_mac(PacketIn, PortNo, DatapathId),
+                      lager:debug([{ls, x}], "[~p][flow] Sent flow mod", [DatapathId]),
                       PortNo
     end,
     send_packet_out(PacketIn, OutPort, DatapathId),
+    update_handle_packet_in_metric(Now0),
     lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
-                                                                     OutPort]),
+                                                                                OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
     {noreply, State#state{switches = Switches1}};
 handle_cast({clear_forwarding_table, DatapathId},
@@ -209,6 +210,13 @@ format_mac(MacBin) ->
 init_exometer() ->
     [ok = exometer:new([T], spiral, [{time_span, 5000}])
      || T <- [flow_mod, packet_in, packet_out]],
+    ok = exometer:new([handle_packet_in], histogram, [{time_span, 5000}]),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
     ok = exometer_report:subscribe(
-           exometer_report_lager, [packet_in], [one, count], 5200).
+           exometer_report_lager, [packet_in], [one, count], 5200),
+    ok = exometer_report:subscribe(
+           exometer_report_lager, [handle_packet_in], [mean], 5200).
+
+update_handle_packet_in_metric(Now0) ->
+    DiffMicro = timer:now_diff(erlang:now(), Now0),
+    exometer:update([handle_packet_in], DiffMicro).
