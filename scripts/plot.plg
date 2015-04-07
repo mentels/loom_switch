@@ -1,5 +1,14 @@
 set term png truecolor
-set output "plot.png"
 set xlabel "test duration [s]"
-set ylabel "flow_mods"
-plot "packet_in.metrics" u 1:3 lc rgb"green" notitle with linespoints
+
+set output "output.png"
+set ylabel "packet_in msgs"
+set y2label "handle_pkt_in time [micros]"
+set y2tics nomirror
+set key on
+plot "pkt_in.metrics" u 1:3 lc rgb"green" with linespoints axis x1y1, \
+     "handle_pkt_in.metrics" u 1:2 lc rgb"blue" with linespoints axis x1y2
+
+# set output "handle_pkt_in.png"
+# set ylabel "handle_pkt_in time [micros]"
+# plot "handle_pkt_in.metrics" u 1:2 lc rgb"green" notitle with linespoints
