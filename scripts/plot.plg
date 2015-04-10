@@ -1,4 +1,4 @@
-set term png truecolor
+set term png truecolor size 1024,768
 set xlabel "test duration [s]"
 
 set output "output.png"
