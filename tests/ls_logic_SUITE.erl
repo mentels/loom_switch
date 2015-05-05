@@ -12,6 +12,10 @@
 -define(PACKET(Dst, Src), <<Dst/binary, Src/binary, 8,6,0,1,8,0,6,4,0,1,50,
                             159,179,220,238,226,10, 0,0,1,0,0,0,0,0,0,10,0,0,2>>).
 
+%%%===================================================================
+%%% Setup
+%%%===================================================================
+
 all() ->
     [should_update_fwd_table,
      should_flood_if_dst_port_unknown,
@@ -25,6 +29,10 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     stop_ls_logic(?DPID),
     ok = meck:unload(ofs_handler).
+
+%%%===================================================================
+%%% Tests
+%%%===================================================================
 
 should_update_fwd_table(_Config) ->
     %% GIVEN
@@ -41,7 +49,7 @@ should_update_fwd_table(_Config) ->
 should_flood_if_dst_port_unknown(_Config) ->
     %% GIVEN
     PacketIn = packet_in(?PACKET(?MAC(100), ?MAC(150)), InPort = 1),
-    
+
     %% GIVEN
     ls_logic:handle_packet_in(?DPID, PacketIn),
 
@@ -53,7 +61,7 @@ should_flood_if_dst_port_unknown(_Config) ->
 should_install_flow_and_forward_if_dst_port_known(_Config) ->
     %% GIVEN
     learn_mac_to_port(LearnedMac = ?MAC(100), LearnedPort = 1),
-        
+
     %% WHEN
     PacketIn = packet_in(?PACKET(LearnedMac, ?MAC(150)), InPort = 2),
     ls_logic:handle_packet_in(?DPID, PacketIn),
@@ -71,6 +79,10 @@ should_install_flow_and_forward_if_dst_port_known(_Config) ->
     Actions = [{output, LearnedPort, no_buffer}],
     ExpectedPacketOut = of_msg_lib:send_packet(4, ?BUFFER_ID, InPort, Actions),
     meck:wait(1, ofs_handler, send, [?DPID, ExpectedPacketOut], 2000).
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 
 learn_mac_to_port(Mac, Port) ->

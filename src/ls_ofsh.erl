@@ -11,8 +11,8 @@ init(_Mode, _Ip, DatapathId, _Features, _Version, _Connection, _Options) ->
     ok = ls_logic:init_main_connection(DatapathId),
     {ok, #state{datapath_id = DatapathId}}.
 
-handle_message({packet_in, _Xid, Body}, #state{datapath_id = DpId}) ->
-    ls_logic:handle_packet_in(DpId, Body);
+handle_message({packet_in, Xid, Body}, #state{datapath_id = DpId}) ->
+    ls_logic:handle_packet_in(DpId, {Xid, Body});
 handle_message(_Msg, _State) ->
     ok.
 
