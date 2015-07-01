@@ -59,7 +59,7 @@ handle_cast({packet_in_arrived, Xid, Now}, #state{times = Times} = State) ->
     ets:insert(Times, {Xid, Now}),
     {noreply, State};
 handle_cast({packet_in_handled, Xid, Now}, #state{times = Times} = State) ->
-    DiffMicro = timer:now_diff(Now, maps:get(Xid, Times)),
+    DiffMicro = timer:now_diff(Now, ets:lookup_element(Times, Xid, 2)),
     update_metric(?CTRL_HANDLE_PKT_IN, DiffMicro),
     ets:delete(Times, Xid),
     {noreply, State};
