@@ -9,7 +9,7 @@
         - [Guest](#guest)
             - [VBox networking](#vbox-networking)
             - [~/.ssh/config](#sshconfig)
-            - [Vbox usefule commands](#vbox-usefule-commands)
+            - [Vbox usefull commands](#vbox-usefull-commands)
         - [VMs](#vms)
             - [/etc/network/interfaces](#etcnetworkinterfaces)
             - [/etc/hosts](#etchosts)
@@ -75,7 +75,7 @@ ForwardX11 yes
 User mininet
 ```
 
-#### Vbox usefule commands
+#### Vbox usefull commands
 
 ```bash
 vboxmanage controlvm <uuid|name> <cmd>
@@ -83,6 +83,7 @@ vboxmanage list runningvms
 VBoxHeadless --startvm <uuid|name>
 vboxmanage midifyvm --name <name> # renames
 vboxmanage startvm fc-mn --type headless
+vboxmanage controlvm NAME pause/resume
 ```
 
 ### VMs
@@ -275,6 +276,6 @@ handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, Now0},
 
 # References
 
-[Mininet VM images](https://github.com/mininet/mininet/wiki/Mininet-VM-Images)
-[Mininet Cluster Edittion](https://github.com/mininet/mininet/wiki/Cluster-Edition-Prototype#run)
-[Mininet EC2](https://github.com/mininet/mininet/wiki/Environment-Setup)
+* [Mininet VM images](https://github.com/mininet/mininet/wiki/Mininet-VM-Images)
+* [Mininet Cluster Edittion](https://github.com/mininet/mininet/wiki/Cluster-Edition-Prototype#run)
+* [Mininet EC2](https://github.com/mininet/mininet/wiki/Environment-Setup)
