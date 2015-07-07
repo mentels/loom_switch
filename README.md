@@ -274,6 +274,22 @@ handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, Now0},
     {noreply, State#state{switches = Switches1}};
 ```
 
+# Pair logs
+
+The `mininet-setup` creates `pair` directories for logs and configuration.
+They are created on each host in the mininet cluster according to the scheme:
+
+* logs
+  `~pair/files/{TIMESTAMP}/log/{MININET_HOST_NAME}-{PAIR_NO}-{STATE}.log`
+* configs
+  `~pair/files/{TIMESTAMP}/config/{MININET_HOST_NAME}-{PAIR_NO}-{STATE}.config`
+
+The `mininet-setup` relies on the logs in the following aspects:
+
+* it checks whether passive parts of pairs started grepping for 'pair started'
+
+* it check whether pairs finished grepping for the 'Finished'
+
 # References
 
 * [Mininet VM images](https://github.com/mininet/mininet/wiki/Mininet-VM-Images)
