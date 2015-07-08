@@ -12,7 +12,7 @@
 
 %% API
 -export([start_link/0]).
--export([of_message_in/1, of_message_out/1]).
+-export([handle_packet_in/2, handle_packet_out/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -24,6 +24,7 @@
 -record(state, {times :: ets:tid()}).
 
 -include_lib("of_protocol/include/of_protocol.hrl").
+-include_lib("of_protocol/include/ofp_v4.hrl").
 
 %%%===================================================================
 %%% API
@@ -32,15 +33,22 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-of_message_in(#ofp_message{xid = Xid, type = packet_in}) ->
-    gen_server:cast(?SERVER, {packet_in_arrived, Xid, erlang:now()});
-of_message_in(_) ->
+handle_packet_in(SwitchId,
+                 #ofp_message{xid= Xid, type = packet_in, body = PacketIn}) ->
+    #ofp_packet_in{buffer_id = BufferId} = PacketIn,
+    Key = {SwitchId, Xid, BufferId},
+    lager:debug("Saving timestamp for ~p", [Key]),
+    gen_server:cast(?SERVER, {packet_in_arrived, Key, erlang:now()});
+handle_packet_in(_, _) ->
     ok.
 
-of_message_out(#ofp_message{xid = Xid, body = PacketOut})
+handle_packet_out(SwitchId, #ofp_message{xid = Xid, body = PacketOut})
   when element(1, PacketOut) =:= ofp_packet_out ->
-    gen_server:cast(?SERVER, {packet_in_handled, Xid, erlang:now()});
-of_message_out(_) ->
+    #ofp_packet_out{buffer_id = BufferId} = PacketOut,
+    Key = {SwitchId, Xid, BufferId},
+    lager:debug("Calculating timestamp for ~p", [Key]),
+    gen_server:cast(?SERVER, {packet_in_handled, Key, erlang:now()});
+handle_packet_out(_, _) ->
     ok.
 
 %%%===================================================================
@@ -55,13 +63,13 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({packet_in_arrived, Xid, Now}, #state{times = Times} = State) ->
-    ets:insert(Times, {Xid, Now}),
+handle_cast({packet_in_arrived, Key, Now}, #state{times = Times} = State) ->
+    ets:insert(Times, {Key, Now}),
     {noreply, State};
-handle_cast({packet_in_handled, Xid, Now}, #state{times = Times} = State) ->
-    DiffMicro = timer:now_diff(Now, ets:lookup_element(Times, Xid, 2)),
+handle_cast({packet_in_handled, Key, Now}, #state{times = Times} = State) ->
+    DiffMicro = timer:now_diff(Now, ets:lookup_element(Times, Key, 2)),
     update_metric(?CTRL_HANDLE_PKT_IN, DiffMicro),
-    ets:delete(Times, Xid),
+    ets:delete(Times, Key),
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.

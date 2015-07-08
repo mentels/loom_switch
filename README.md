@@ -207,7 +207,7 @@ it is parsed (snippet from of_driver/of_driver_connection):
 ```erlang
 handle_messages([Message|Rest], NewState) ->
     ?DEBUG("Receive from ~p: ~p~n", [NewState#?STATE.address, Message]),
-    ls_metrics:of_message_in(Message),
+    ls_metrics:handle_packet_in(NewState#?STATE.datapath_mac, Message),
     case handle_message(Message, NewState) of
         {stop, Reason, State} ->
             {stop, Reason, State};
@@ -216,6 +216,9 @@ handle_messages([Message|Rest], NewState) ->
     end.
 ```
 
+In the ls_metrics:handle_packet_in/2 call timestamp is made and rememberd
+based on the Switch Datapath Mac, message Xid and packet_in BufferId.
+
 The time is measured when correspoding of_packet_out is sent from a controller:
 just after the packet is encoded an before it is sent to the socket
 (another snippet from of_driver/of_driver_connection_erl):
@@ -223,11 +226,12 @@ just after the packet is encoded an before it is sent to the socket
 ```erlang
 do_send(Msg, #?STATE{protocol = Protocol,
                      socket = Socket,
-                     address = IpAddr} = _State) ->
+                      address = IpAddr,
+                      datapath_mac = DatapathMac} = _State) ->
+    ls_metrics:handle_packet_out(DatapathMac,Msg),
     case of_protocol:encode(Msg) of
         {ok, EncodedMessage} ->
             ?DEBUG("Send to ~p: ~p~n", [IpAddr, Msg]),
-            ls_metrics:of_message_out(Msg),
             of_driver_utils:send(Protocol, Socket, EncodedMessage);
         {error, Error} ->
             {error, Error}
