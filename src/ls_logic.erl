@@ -69,6 +69,7 @@ terminate_main_connection(DatapathId) ->
 %% ------------------------------------------------------------------
 
 init([]) ->
+    process_flag(trap_exit, true),
     init_exometer(),
     lager:debug([{ls, x}], "Initialized loom switch logic"),
     {ok, #state{}}.
@@ -140,6 +141,8 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    [ok = exometer:delete([T]) || T <- [flow_mod, packet_in, packet_out,
+                                        handle_packet_in]],
     ok.
 
 code_change(_OldVsn, State, _Extra) ->

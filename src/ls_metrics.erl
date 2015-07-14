@@ -56,6 +56,7 @@ handle_packet_out(_, _) ->
 %%%===================================================================
 
 init([]) ->
+    process_flag(trap_exit, true),
     setup_measurement(?CTRL_HANDLE_PKT_IN),
     {ok, #state{times = ets:new(times, [])}}.
 
@@ -78,6 +79,7 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    ok = exometer:delete(?CTRL_HANDLE_PKT_IN),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
