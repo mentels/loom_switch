@@ -23,6 +23,9 @@
         - [Parsing metrics](#parsing-metrics)
         - [whitebox metrics](#whitebox-metrics)
         - [Blackbox](#blackbox)
+- [Pair logs](#pair-logs)
+- [Running loom_switch](#running-loom_switch)
+- [References](#references)
 
 <!-- markdown-toc end -->
 
@@ -293,6 +296,34 @@ The `mininet-setup` relies on the logs in the following aspects:
 * it checks whether passive parts of pairs started grepping for 'pair started'
 
 * it check whether pairs finished grepping for the 'Finished'
+
+# Running loom_switch
+
+The `loom_switch` application is to be run by [ls_runner](https://github.com/mentels/ls_runner)
+application.
+
+It communicates with the `mininet-setup` and starts/stops the swtich logic
+when requested.
+
+The protocol is illustreated below (MNS - `mininet-setup`; LSR - `ls_runner`):
+
+1. Beofre test
+```
+   MNS ----- prepare/{RUN_ID} ----> LSR
+   MNS <----- ready ---- LSR
+```
+   * it is sent before MNS starts the test
+   * before sending the `ready` response LSR is expected to start the switch
+and delete `log/notice.log` file that has the metrics
+
+2. After test
+```
+   MNS ----- stop/{RUN_ID} ----> LSR
+   MNS <----- stopped ---- LSR
+```
+   * it is sent after the test is completed
+   * LSR is expected to stop the switch and copy the `log/notice.log` to
+`log/{RUN_ID}/notice.log` file.
 
 # References
 
