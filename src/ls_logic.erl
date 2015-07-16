@@ -214,13 +214,13 @@ format_mac(MacBin) ->
 init_exometer() ->
     [ok = exometer:new([T], spiral, [{time_span, 5000}])
      || T <- [flow_mod, packet_in, packet_out]],
-    ok = exometer:new([handle_packet_in], histogram, [{time_span, 5000}]),
+    ok = exometer:new([app_handle_packet_in], histogram, [{time_span, 5000}]),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
     ok = exometer_report:subscribe(
            exometer_report_lager, [packet_in], [one, count], 5200),
     ok = exometer_report:subscribe(
-           exometer_report_lager, [handle_packet_in], [mean], 5200).
+           exometer_report_lager, [app_handle_packet_in], [mean], 5200).
 
 update_handle_packet_in_metric(Now0) ->
     DiffMicro = timer:now_diff(erlang:now(), Now0),
-    exometer:update([handle_packet_in], DiffMicro).
+    exometer:update([app_handle_packet_in], DiffMicro).
