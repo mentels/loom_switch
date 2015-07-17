@@ -142,7 +142,7 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, _State) ->
     [ok = exometer:delete([T]) || T <- [flow_mod, packet_in, packet_out,
-                                        handle_packet_in]],
+                                        app_handle_packet_in]],
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
