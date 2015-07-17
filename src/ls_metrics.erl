@@ -57,6 +57,14 @@ handle_packet_out(_, _) ->
 
 init([]) ->
     process_flag(trap_exit, true),
+    [ok = exometer:new([T], spiral, [{time_span, 5000}])
+     || T <- [flow_mod, packet_in, packet_out]],
+    ok = exometer:new([app_handle_packet_in], histogram, [{time_span, 5000}]),
+    ok = exometer_report:add_reporter(exometer_report_lager, []),
+    ok = exometer_report:subscribe(
+           exometer_report_lager, [packet_in], [one, count], 5200),
+    ok = exometer_report:subscribe(
+           exometer_report_lager, [app_handle_packet_in], [mean], 5200),
     setup_measurement(?CTRL_HANDLE_PKT_IN),
     {ok, #state{times = ets:new(times, [])}}.
 
@@ -80,7 +88,8 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, _State) ->
     ok = exometer:delete(?CTRL_HANDLE_PKT_IN),
-    ok.
+    [ok = exometer:delete([T]) || T <- [flow_mod, packet_in, packet_out,
+                                        app_handle_packet_in]].
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -91,12 +100,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 setup_measurement(Metric) ->
     ok = exometer:new(Metric, histogram, [{time_span, 5000}]),
-    case exometer_report:add_reporter(exometer_report_lager, []) of
-        {error, already_running} ->
-            lager:debug({ls, x}, "Lager reporter already running");
-        ok ->
-            ok
-    end,
     ok = exometer_report:subscribe(
            exometer_report_lager, Metric, [mean], 5200).
 

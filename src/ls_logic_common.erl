@@ -1,28 +1,12 @@
 -module(ls_logic_common).
 
--export([init_exometer/0, handle_packet_in/5, terminate/0]).
+-export([handle_packet_in/5]).
 
 -include_lib("of_protocol/include/of_protocol.hrl").
 
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
-
-init_exometer() ->
-    [ok = exometer:new([T], spiral, [{time_span, 5000}])
-     || T <- [flow_mod, packet_in, packet_out]],
-    ok = exometer:new([app_handle_packet_in], histogram, [{time_span, 5000}]),
-    case exometer_report:add_reporter(exometer_report_lager, []) of
-        ok ->
-            ok;
-        {error, already_running} ->
-            ok
-    end,
-    ok = exometer_report:subscribe(
-           exometer_report_lager, [packet_in], [one, count], 5200),
-    ok = exometer_report:subscribe(
-           exometer_report_lager, [app_handle_packet_in], [mean], 5200).
-
 
 handle_packet_in(DatapathId, Xid, PacketIn, FwdTable0, T1) ->
     FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
@@ -39,10 +23,6 @@ handle_packet_in(DatapathId, Xid, PacketIn, FwdTable0, T1) ->
     lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
                                                                                 OutPort]),
     FwdTable1.
-
-terminate() ->
-    [ok = exometer:delete([T]) || T <- [flow_mod, packet_in, packet_out,
-                                        app_handle_packet_in]].
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

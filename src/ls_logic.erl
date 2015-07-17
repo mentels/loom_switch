@@ -70,7 +70,6 @@ terminate_main_connection(DatapathId) ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    ls_logic_common:init_exometer(),
     lager:debug([{ls, x}], "Initialized loom switch logic"),
     {ok, #state{}}.
 

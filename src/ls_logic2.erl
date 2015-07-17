@@ -53,7 +53,6 @@ clear_forwarding_table(Pid) ->
 
 init([DatapathId]) ->
     process_flag(trap_exit, true),
-    ls_logic_common:init_exometer(),
     lager:debug([{ls, x}], "[~p] Initialized loom switch logic2", [DatapathId]),
     {ok, #state{datapath_id = DatapathId}, 0}.
 
