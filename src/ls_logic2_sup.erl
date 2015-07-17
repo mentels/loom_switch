@@ -1,4 +1,4 @@
--module(ls_sup).
+-module(ls_logic2_sup).
 
 -behaviour(supervisor).
 
@@ -23,16 +23,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    BasicChildren = [?CHILD(ls_ctrl_client, worker),
-                     ?CHILD(ls_metrics, worker)],
-    Mode = application:get_env(ls, mode, regular),
-    lager:info([{ls, x}], "Starting ls in ~p mode", [Mode]),
-    Children = case  Mode of
-                   proc_per_switch = Mode ->
-                       application:set_env(ofs_handler, callback_module, ls_ofsh2),
-                       [?CHILD(ls_logic2_sup, supervisor) | BasicChildren];
-                   regular = Mode ->
-                       [?CHILD(ls_logic, worker) | BasicChildren]
-               end,
-    {ok, {{one_for_one, 5, 10}, Children}}.
+    {ok, {{simple_one_for_one, 5, 10}, [?CHILD(ls_logic2, worker)]}}.
 

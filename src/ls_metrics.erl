@@ -91,6 +91,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 setup_measurement(Metric) ->
     ok = exometer:new(Metric, histogram, [{time_span, 5000}]),
+    case exometer_report:add_reporter(exometer_report_lager, []) of
+        {error, already_running} ->
+            lager:debug({ls, x}, "Lager reporter already running");
+        ok ->
+            ok
+    end,
     ok = exometer_report:subscribe(
            exometer_report_lager, Metric, [mean], 5200).
 
