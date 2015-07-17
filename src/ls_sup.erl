@@ -24,5 +24,6 @@ start_link() ->
 
 init([]) ->
     {ok, {{one_for_one, 5, 10}, [?CHILD(ls_logic, worker),
+                                 ?CHILD(ls_ctrl_client, worker),
                                  ?CHILD(ls_metrics, worker)]}}.
 

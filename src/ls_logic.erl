@@ -184,14 +184,14 @@ install_flow_to_dst_mac(PacketIn, OutPort, DatapathId) ->
             {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
     FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
     ok = exometer:update([flow_mod], 1),
-    ok = ofs_handler:send(DatapathId, FlowMod).
+    ok = ls_ctrl_client:send(DatapathId, FlowMod).
 
 send_packet_out(DatapathId, Xid, PacketIn, OutPort) ->
     [InPort, BufferId] = packet_in_extract([in_port, buffer_id], PacketIn),
     Actions = [{output, OutPort, no_buffer}],
     PacketOut = of_msg_lib:send_packet(4, BufferId, InPort, Actions),
     ok = exometer:update([packet_out], 1),
-    ofs_handler:send(DatapathId, PacketOut#ofp_message{xid = Xid}).
+    ok = ls_ctrl_client:send(DatapathId, PacketOut#ofp_message{xid = Xid}).
 
 packet_in_extract(Elements, PacketIn) when is_list(Elements) ->
     [packet_in_extract(H, PacketIn) || H <- Elements];
