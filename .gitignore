@@ -6,5 +6,5 @@ erl_crash.dump
 *.beam
 log/
 *.metrics
-*.png
+output.png
 

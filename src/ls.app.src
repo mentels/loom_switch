@@ -6,7 +6,9 @@
   {applications, [
                   kernel,
                   stdlib,
+                  of_msg_lib,
                   ofs_handler,
+                  of_driver,
                   exometer
                  ]},
   {mod, { ls_app, []}},

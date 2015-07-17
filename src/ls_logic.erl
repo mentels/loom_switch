@@ -49,9 +49,10 @@ init_main_connection(DatapathId) ->
     gen_server:cast(?SERVER, {init_main_connection, DatapathId}),
     lager:info([{ls, x}], "[~p] Initialized main connection", [DatapathId]).
 
-handle_packet_in(DatapathId, PacketIn) ->
+handle_packet_in(DatapathId, {Xid, PacketIn}) ->
     exometer:update([packet_in], 1),
-    gen_server:cast(?SERVER, {handle_packet_in, DatapathId, PacketIn, erlang:now()}).
+    gen_server:cast(?SERVER,
+                    {handle_packet_in, DatapathId, Xid, PacketIn, erlang:now()}).
 
 get_forwarding_table(DatapathId) ->
     gen_server:call(?SERVER, {get_forwarding_table, DatapathId}).
@@ -68,6 +69,7 @@ terminate_main_connection(DatapathId) ->
 %% ------------------------------------------------------------------
 
 init([]) ->
+    process_flag(trap_exit, true),
     init_exometer(),
     lager:debug([{ls, x}], "Initialized loom switch logic"),
     {ok, #state{}}.
@@ -103,7 +105,7 @@ handle_cast({terminate_main_connection, DatapathId},
     end,
     Swtiches1 = maps:remove(DatapathId, Switches0),
     {noreply, State#state{switches = Swtiches1}};
-handle_cast({handle_packet_in, DatapathId, PacketIn, Now0},
+handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, Now0},
             #state{switches = Switches0} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
@@ -115,7 +117,7 @@ handle_cast({handle_packet_in, DatapathId, PacketIn, Now0},
                       lager:debug([{ls, x}], "[~p][flow] Sent flow mod", [DatapathId]),
                       PortNo
     end,
-    send_packet_out(PacketIn, OutPort, DatapathId),
+    send_packet_out(DatapathId, Xid, PacketIn, OutPort),
     update_handle_packet_in_metric(Now0),
     lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
                                                                                 OutPort]),
@@ -139,6 +141,8 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
+    [ok = exometer:delete([T]) || T <- [flow_mod, packet_in, packet_out,
+                                        handle_packet_in]],
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -182,12 +186,12 @@ install_flow_to_dst_mac(PacketIn, OutPort, DatapathId) ->
     ok = exometer:update([flow_mod], 1),
     ok = ofs_handler:send(DatapathId, FlowMod).
 
-send_packet_out(PacketIn, OutPort, DatapathId) ->
+send_packet_out(DatapathId, Xid, PacketIn, OutPort) ->
     [InPort, BufferId] = packet_in_extract([in_port, buffer_id], PacketIn),
     Actions = [{output, OutPort, no_buffer}],
     PacketOut = of_msg_lib:send_packet(4, BufferId, InPort, Actions),
     ok = exometer:update([packet_out], 1),
-    ofs_handler:send(DatapathId, PacketOut).
+    ofs_handler:send(DatapathId, PacketOut#ofp_message{xid = Xid}).
 
 packet_in_extract(Elements, PacketIn) when is_list(Elements) ->
     [packet_in_extract(H, PacketIn) || H <- Elements];
@@ -210,13 +214,13 @@ format_mac(MacBin) ->
 init_exometer() ->
     [ok = exometer:new([T], spiral, [{time_span, 5000}])
      || T <- [flow_mod, packet_in, packet_out]],
-    ok = exometer:new([handle_packet_in], histogram, [{time_span, 5000}]),
+    ok = exometer:new([app_handle_packet_in], histogram, [{time_span, 5000}]),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
     ok = exometer_report:subscribe(
            exometer_report_lager, [packet_in], [one, count], 5200),
     ok = exometer_report:subscribe(
-           exometer_report_lager, [handle_packet_in], [mean], 5200).
+           exometer_report_lager, [app_handle_packet_in], [mean], 5200).
 
 update_handle_packet_in_metric(Now0) ->
     DiffMicro = timer:now_diff(erlang:now(), Now0),
-    exometer:update([handle_packet_in], DiffMicro).
+    exometer:update([app_handle_packet_in], DiffMicro).
