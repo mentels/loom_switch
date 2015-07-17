@@ -1,6 +1,6 @@
 -module(ls_logic_common).
 
--export([handle_packet_in/5]).
+-export([handle_packet_in/6]).
 
 -include_lib("of_protocol/include/of_protocol.hrl").
 
@@ -8,13 +8,13 @@
 %% API
 %% ------------------------------------------------------------------
 
-handle_packet_in(DatapathId, Xid, PacketIn, FwdTable0, T1) ->
+handle_packet_in(DatapathId, Xid, PacketIn, FwdTable0, T1, Opts) ->
     FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
     OutPort = case get_port_for_dst_mac(PacketIn, FwdTable0) of
                   undefined ->
                       flood;
                   PortNo ->
-                      install_flow_to_dst_mac(PacketIn, PortNo, DatapathId),
+                      install_flow_to_dst_mac(PacketIn, PortNo, DatapathId, Opts),
                       lager:debug([{ls, x}], "[~p][flow] Sent flow mod", [DatapathId]),
                       PortNo
               end,
@@ -50,12 +50,13 @@ get_port_for_dst_mac(PacketIn, FwdTable) ->
             Port
     end.
 
-install_flow_to_dst_mac(PacketIn, OutPort, DatapathId) ->
+install_flow_to_dst_mac(PacketIn, OutPort, DatapathId, Opts) ->
     [InPort, DstMac] = packet_in_extract([in_port, dst_mac], PacketIn),
     Matches = [{in_port, InPort}, {eth_dst, DstMac}],
     Instructions = [{apply_actions, [{output, OutPort, no_buffer}]}],
     Opts = [{table_id,0}, {priority, 100},
-            {idle_timeout, 0}, {idle_timeout, 0},
+            {idle_timeout, get_opt(idle_timeout, Opts)},
+            {hard_timeout, get_opt(hard_timeout, Opts)},
             {cookie, <<0,0,0,0,0,0,0,10>>},
             {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
     FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
@@ -90,3 +91,6 @@ format_mac(MacBin) ->
 update_handle_packet_in_metric(T1) ->
     DiffMicro = timer:now_diff(os:timestamp(), T1),
     exometer:update([app_handle_packet_in], DiffMicro).
+
+get_opt(O, Opts) ->
+    proplists:get_value(O, Opts).
