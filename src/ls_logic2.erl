@@ -29,7 +29,7 @@
 %% ------------------------------------------------------------------
 
 start_link(DatapathId) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [DatapathId], []).
+    gen_server:start_link(?MODULE, [DatapathId], []).
 
 init_main_connection(DatapathId) ->
     supervisor:start_child(ls_logic2_sup, [DatapathId]).
