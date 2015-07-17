@@ -24,7 +24,8 @@
         - [whitebox metrics](#whitebox-metrics)
         - [Blackbox](#blackbox)
 - [Pair logs](#pair-logs)
-- [Running loom_switch](#running-loom_switch)
+- [Running loom_switch](#running-loomswitch)
+- [loom_switch modes](#loomswitch-modes)
 - [References](#references)
 
 <!-- markdown-toc end -->
@@ -324,6 +325,21 @@ and delete `log/notice.log` file that has the metrics
    * it is sent after the test is completed
    * LSR is expected to stop the switch and copy the `log/notice.log` to
 `log/{RUN_ID}/notice.log` file.
+
+# loom_switch modes
+
+From sys.config:
+
+```erlang
+[{ls, [
+       {mode, proc_per_switch}
+       %% {mode, regular}
+      ]},
+```
+
+In the `regular` mode each switch is handled in the same process; in the
+`proc_per_switch` mode there's a gen_server started for each switch meaning
+that they're handled asynchronously.
 
 # References
 
