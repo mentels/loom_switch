@@ -38,7 +38,7 @@ handle_packet_in(SwitchId,
     #ofp_packet_in{buffer_id = BufferId} = PacketIn,
     Key = {SwitchId, Xid, BufferId},
     lager:debug("Saving timestamp for ~p", [Key]),
-    gen_server:cast(?SERVER, {packet_in_arrived, Key, erlang:now()});
+    gen_server:cast(?SERVER, {packet_in_arrived, Key, os:timestamp()});
 handle_packet_in(_, _) ->
     ok.
 
@@ -47,7 +47,7 @@ handle_packet_out(SwitchId, #ofp_message{xid = Xid, body = PacketOut})
     #ofp_packet_out{buffer_id = BufferId} = PacketOut,
     Key = {SwitchId, Xid, BufferId},
     lager:debug("Calculating timestamp for ~p", [Key]),
-    gen_server:cast(?SERVER, {packet_in_handled, Key, erlang:now()});
+    gen_server:cast(?SERVER, {packet_in_handled, Key, os:timestamp()});
 handle_packet_out(_, _) ->
     ok.
 
@@ -64,11 +64,11 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({packet_in_arrived, Key, Now}, #state{times = Times} = State) ->
-    ets:insert(Times, {Key, Now}),
+handle_cast({packet_in_arrived, Key, T1}, #state{times = Times} = State) ->
+    ets:insert(Times, {Key, T1}),
     {noreply, State};
-handle_cast({packet_in_handled, Key, Now}, #state{times = Times} = State) ->
-    DiffMicro = timer:now_diff(Now, ets:lookup_element(Times, Key, 2)),
+handle_cast({packet_in_handled, Key, T2}, #state{times = Times} = State) ->
+    DiffMicro = timer:now_diff(T2, ets:lookup_element(Times, Key, 2)),
     update_metric(?CTRL_HANDLE_PKT_IN, DiffMicro),
     ets:delete(Times, Key),
     {noreply, State};

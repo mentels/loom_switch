@@ -52,7 +52,7 @@ init_main_connection(DatapathId) ->
 handle_packet_in(DatapathId, {Xid, PacketIn}) ->
     exometer:update([packet_in], 1),
     gen_server:cast(?SERVER,
-                    {handle_packet_in, DatapathId, Xid, PacketIn, erlang:now()}).
+                    {handle_packet_in, DatapathId, Xid, PacketIn, os:timestamp()}).
 
 get_forwarding_table(DatapathId) ->
     gen_server:call(?SERVER, {get_forwarding_table, DatapathId}).
@@ -105,7 +105,7 @@ handle_cast({terminate_main_connection, DatapathId},
     end,
     Swtiches1 = maps:remove(DatapathId, Switches0),
     {noreply, State#state{switches = Swtiches1}};
-handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, Now0},
+handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, T1},
             #state{switches = Switches0} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1  = learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0),
@@ -118,7 +118,7 @@ handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, Now0},
                       PortNo
     end,
     send_packet_out(DatapathId, Xid, PacketIn, OutPort),
-    update_handle_packet_in_metric(Now0),
+    update_handle_packet_in_metric(T1),
     lager:debug([{ls, x}], "[~p][pkt_out] Sent packet out through port: ~p~n", [DatapathId,
                                                                                 OutPort]),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
@@ -221,6 +221,6 @@ init_exometer() ->
     ok = exometer_report:subscribe(
            exometer_report_lager, [app_handle_packet_in], [mean], 5200).
 
-update_handle_packet_in_metric(Now0) ->
-    DiffMicro = timer:now_diff(erlang:now(), Now0),
+update_handle_packet_in_metric(T1) ->
+    DiffMicro = timer:now_diff(os:timestamp(), T1),
     exometer:update([app_handle_packet_in], DiffMicro).
