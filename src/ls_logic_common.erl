@@ -54,12 +54,12 @@ install_flow_to_dst_mac(PacketIn, OutPort, DatapathId, Opts) ->
     [InPort, DstMac] = packet_in_extract([in_port, dst_mac], PacketIn),
     Matches = [{in_port, InPort}, {eth_dst, DstMac}],
     Instructions = [{apply_actions, [{output, OutPort, no_buffer}]}],
-    Opts = [{table_id,0}, {priority, 100},
-            {idle_timeout, get_opt(idle_timeout, Opts)},
-            {hard_timeout, get_opt(hard_timeout, Opts)},
-            {cookie, <<0,0,0,0,0,0,0,10>>},
-            {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
-    FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, Opts),
+    FlowOpts = [{table_id,0}, {priority, 100},
+                {idle_timeout, get_opt(idle_timeout, Opts)},
+                {hard_timeout, get_opt(hard_timeout, Opts)},
+                {cookie, <<0,0,0,0,0,0,0,10>>},
+                {cookie_mask, <<0,0,0,0,0,0,0,0>>}],
+    FlowMod = of_msg_lib:flow_add(4, Matches, Instructions, FlowOpts),
     ok = exometer:update([flow_mod], 1),
     ok = ls_ctrl_client:send(DatapathId, FlowMod).
 
