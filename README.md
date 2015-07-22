@@ -24,8 +24,8 @@
         - [whitebox metrics](#whitebox-metrics)
         - [Blackbox](#blackbox)
 - [Pair logs](#pair-logs)
-- [Running loom_switch](#running-loomswitch)
-- [loom_switch modes](#loomswitch-modes)
+- [Running loom_switch](#running-loom_switch)
+- [loom_switch customizations](#loom_switch-customizations)
 - [References](#references)
 
 <!-- markdown-toc end -->
@@ -326,20 +326,28 @@ and delete `log/notice.log` file that has the metrics
    * LSR is expected to stop the switch and copy the `log/notice.log` to
 `log/{RUN_ID}/notice.log` file.
 
-# loom_switch modes
+# loom_switch customizations
+
+Following customizations are available
+
+* modes: either regular or process per switch
+  In the `regular` mode each switch is handled in the same process; in the
+  `proc_per_switch` mode there's a gen_server started for each switch meaning
+  that they're handled asynchronously.
+* idle/hard timeouts for flow mods
+* number of [online schedulers](http://erlang.org/doc/man/erl.html#+S)
 
 From sys.config:
 
 ```erlang
 [{ls, [
-       {mode, proc_per_switch}
-       %% {mode, regular}
+       %% {mode, proc_per_switch},
+       {logic_opts, [{idle_timeout, 10},
+                     {hard_timeout, 30}]},
+       {schedulers, default},
+       {mode, regular}
       ]},
 ```
-
-In the `regular` mode each switch is handled in the same process; in the
-`proc_per_switch` mode there's a gen_server started for each switch meaning
-that they're handled asynchronously.
 
 # References
 

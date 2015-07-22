@@ -9,7 +9,12 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+
+-define(CHILD(I, Args, Type),
+        {I, {I, start_link, [Args]}, permanent, 5000, Type, [I]}).
+
+-define(CHILD(I, Type),
+        {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -23,6 +28,8 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    Opts = application:get_env(ls, logic_opts, [{idle_timeout, 0},
+                                                {hard_timeout, 0}]),
     BasicChildren = [?CHILD(ls_ctrl_client, worker),
                      ?CHILD(ls_metrics, worker)],
     Mode = application:get_env(ls, mode, regular),
@@ -30,9 +37,10 @@ init([]) ->
     Children = case  Mode of
                    proc_per_switch = Mode ->
                        application:set_env(ofs_handler, callback_module, ls_ofsh2),
-                       [?CHILD(ls_logic2_sup, supervisor) | BasicChildren];
+                       [?CHILD(ls_logic2_sup, Opts, supervisor)
+                        | BasicChildren];
                    regular = Mode ->
-                       [?CHILD(ls_logic, worker) | BasicChildren]
+                       [?CHILD(ls_logic, Opts, worker) | BasicChildren]
                end,
     {ok, {{one_for_one, 5, 10}, Children}}.
 

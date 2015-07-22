@@ -6,8 +6,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start/0,
-         start_link/0,
+-export([start_link/1,
          stop/0,
          init_main_connection/1,
          handle_packet_in/2,
@@ -28,7 +27,7 @@
 
 -type fwd_table() :: #{MacAddr :: string() => SwitchPort :: integer()}.
 -type switches() :: #{DatapathId :: string() => ForwardingTable :: fwd_table()}.
--record(state, {switches = #{} :: switches()}).
+-record(state, {switches = #{} :: switches(), logic_opts :: []}).
 
 -include_lib("of_protocol/include/of_protocol.hrl").
 
@@ -36,11 +35,8 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start() ->
-    gen_server:start({local, ?SERVER}, ?MODULE, [], []).
-
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Opts) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [Opts], []).
 
 stop() ->
     gen_server:call(?SERVER, stop).
@@ -68,10 +64,10 @@ terminate_main_connection(DatapathId) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init([]) ->
+init([Opts]) ->
     process_flag(trap_exit, true),
     lager:debug([{ls, x}], "Initialized loom switch logic"),
-    {ok, #state{}}.
+    {ok, #state{logic_opts = Opts}}.
 
 handle_call({get_forwarding_table, DatapathId}, _From,
             #state{switches = Switches} = State) ->
@@ -105,10 +101,10 @@ handle_cast({terminate_main_connection, DatapathId},
     Swtiches1 = maps:remove(DatapathId, Switches0),
     {noreply, State#state{switches = Swtiches1}};
 handle_cast({handle_packet_in, DatapathId, Xid, PacketIn, T1},
-            #state{switches = Switches0} = State) ->
+            #state{switches = Switches0, logic_opts = Opts} = State) ->
     FwdTable0 = maps:get(DatapathId, Switches0),
     FwdTable1 = ls_logic_common:handle_packet_in(
-                  DatapathId, Xid, PacketIn, FwdTable0, T1),
+                  DatapathId, Xid, PacketIn, FwdTable0, T1, Opts),
     Switches1 = maps:update(DatapathId, FwdTable1, Switches0),
     {noreply, State#state{switches = Switches1}};
 handle_cast({clear_forwarding_table, DatapathId},
@@ -129,7 +125,7 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
-    ls_logic_common:terminate().
+    ok.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

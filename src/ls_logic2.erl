@@ -6,7 +6,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/1, init_main_connection/1, terminate_main_connection/1,
+-export([start_link/2, init_main_connection/1, terminate_main_connection/1,
          handle_packet_in/2, get_forwarding_table/1, clear_forwarding_table/1]).
 
 %% ------------------------------------------------------------------
@@ -22,14 +22,15 @@
 
 -type fwd_table() :: #{MacAddr :: string() => SwitchPort :: integer()}.
 -record(state, {datapath_id :: binary(),
-               fwd_table = #{} :: fwd_table()}).
+                fwd_table = #{} :: fwd_table(),
+                logic_opts}).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link(DatapathId) ->
-    gen_server:start_link(?MODULE, [DatapathId], []).
+start_link(DatapathId, Opts) ->
+    gen_server:start_link(?MODULE, [DatapathId, Opts], []).
 
 init_main_connection(DatapathId) ->
     supervisor:start_child(ls_logic2_sup, [DatapathId]).
@@ -51,10 +52,10 @@ clear_forwarding_table(Pid) ->
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
-init([DatapathId]) ->
+init([Opts, DatapathId]) ->
     process_flag(trap_exit, true),
     lager:debug([{ls, x}], "[~p] Initialized loom switch logic2", [DatapathId]),
-    {ok, #state{datapath_id = DatapathId}, 0}.
+    {ok, #state{datapath_id = DatapathId, logic_opts = Opts}, 0}.
 
 
 handle_call(get_forwarding_table, _From,
@@ -64,9 +65,10 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({handle_packet_in, Xid, PacketIn, T1},
-            #state{datapath_id = DatapathId, fwd_table = FwdTable0} = State) ->
+            #state{datapath_id = DatapathId, fwd_table = FwdTable0,
+                   logic_opts = Opts} = State) ->
     FwdTable1 = ls_logic_common:handle_packet_in(
-                  DatapathId, Xid, PacketIn, FwdTable0, T1),
+                  DatapathId, Xid, PacketIn, FwdTable0, T1, Opts),
     {noreply, State#state{fwd_table = FwdTable1}};
 handle_cast(clear_forwarding_table, #state{datapath_id = DatapathId} = State) ->
     lager:debug([{ls, x}], "[~p][clear_fwd_t] Cleared ~n",
