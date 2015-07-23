@@ -202,6 +202,44 @@ and output this time and value(s) to a file. For example for the
 `handle_packet_in` metric the script outputs a line with two values
 TIME MEAN for each metric's log to the `handle_packet_in.metrics`.
 
+### Metrics configuration
+
+A snippet from `ls_metrics`:
+
+```erlang
+setup_packet_in_measurements() ->
+    [begin
+         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
+         %% histogram reports min, max, mean of values stored during a
+         %% given timestamp. By deafault it also aggretates mean, max, min
+         %% in a time slot ({slot_period, MILIS} option). So if time span is
+         %% 60s and slot_period is 10s, histogram will return a mean of 10
+         %% slot periods
+         %% provided datapoints:
+         %% max, min, mean, median, percentiles, number of values used in
+         %% calculation
+         ok = exometer:new(M, histogram, [Opts]),
+         ok = exometer_report:subscribe(exometer_report_lager, M, [mean],
+                                        _ReportInterval = ?SEC_TO_MILI(10))
+     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN]].
+
+setup_counters() ->
+    [begin
+         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
+         %% spiral is based on histogram but it returns a _sum_ of all
+         %% values provided during a time span
+         %% it prvides two datapoints:
+         %% one - all values summed during a time span
+         %% count - sum of ALL values
+         ok = exometer:new([T], spiral, [Opts]),
+         ok = exometer_report:subscribe(exometer_report_lager, [T], [one, count],
+                                        _ReportInterval = ?SEC_TO_MILI(10))
+     end || T <- [flow_mod, packet_in, packet_out]].
+```
+
+[histogram documentation](https://github.com/Feuerlabs/exometer_core/blob/aca4572473437bc6a4ebf3d9a0f661e4e081fb82/doc/exometer_histogram.md)
+
+[exometer_core README](https://github.com/Feuerlabs/exometer_core)
 
 ### whitebox metrics
 

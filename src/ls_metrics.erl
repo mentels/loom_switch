@@ -20,6 +20,8 @@
 
 -define(SERVER, ?MODULE).
 -define(CTRL_HANDLE_PKT_IN, [controller_handle_packet_in]).
+-define(APP_HANDLE_PKT_IN, [app_handle_packet_in]).
+-define(SEC_TO_MILI(X), X * 1000).
 
 -record(state, {times :: ets:tid()}).
 
@@ -57,15 +59,9 @@ handle_packet_out(_, _) ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    [ok = exometer:new([T], spiral, [{time_span, 5000}])
-     || T <- [flow_mod, packet_in, packet_out]],
-    ok = exometer:new([app_handle_packet_in], histogram, [{time_span, 5000}]),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
-    ok = exometer_report:subscribe(
-           exometer_report_lager, [packet_in], [one, count], 5200),
-    ok = exometer_report:subscribe(
-           exometer_report_lager, [app_handle_packet_in], [mean], 5200),
-    setup_measurement(?CTRL_HANDLE_PKT_IN),
+    setup_counters(),
+    setup_packet_in_measurements(),
     {ok, #state{times = ets:new(times, [])}}.
 
 handle_call(_Request, _From, State) ->
@@ -98,10 +94,37 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-setup_measurement(Metric) ->
-    ok = exometer:new(Metric, histogram, [{time_span, 5000}]),
-    ok = exometer_report:subscribe(
-           exometer_report_lager, Metric, [mean], 5200).
+setup_packet_in_measurements() ->
+    [begin
+         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
+         %% histogram reports min, max, mean of values stored during a
+         %% given timestamp. By deafault it also aggretates mean, max, min
+         %% in a time slot ({slot_period, MILIS} option). So if time span is
+         %% 60s and slot_period is 10s, histogram will return a mean of 10
+         %% slot periods
+         %% provided datapoints:
+         %% max, min, mean, median, percentiles, number of values used in
+         %% calculation
+         ok = exometer:new(M, histogram, [Opts]),
+         ok = exometer_report:subscribe(exometer_report_lager, M, [mean],
+                                        _ReportInterval = ?SEC_TO_MILI(10))
+     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN]].
+
+setup_counters() ->
+    [begin
+         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
+         %% spiral is based on histogram but it returns a _sum_ of all
+         %% values provided during a time span
+         %% it prvides two datapoints:
+         %% one - all values summed during a time span
+         %% count - sum of ALL values
+         ok = exometer:new([T], spiral, [Opts]),
+         ok = exometer_report:subscribe(exometer_report_lager, [T], [one, count],
+                                        _ReportInterval = ?SEC_TO_MILI(10))
+     end || T <- [flow_mod, packet_in, packet_out]].
 
 update_metric(Metric, DiffMicro) ->
     ok = exometer:update(Metric, DiffMicro).
+
+report_values_aggregated_during_period(Micros) ->
+    {time_span, Micros}.
