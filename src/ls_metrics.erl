@@ -12,7 +12,7 @@
 
 %% API
 -export([start_link/0]).
--export([handle_packet_in/2, handle_packet_out/2]).
+-export([handle_packet_in/2, handle_packet_out/2, update_fwd_table_size/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -44,6 +44,9 @@ handle_packet_in(SwitchId,
 handle_packet_in(_, _) ->
     ok.
 
+update_fwd_table_size(Size) ->
+    gen_server:cast(?SERVER, {fwd_table_size, Size}).
+
 handle_packet_out(SwitchId, #ofp_message{xid = Xid, body = PacketOut})
   when element(1, PacketOut) =:= ofp_packet_out ->
     #ofp_packet_out{buffer_id = BufferId} = PacketOut,
@@ -61,7 +64,7 @@ init([]) ->
     process_flag(trap_exit, true),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
     setup_counters(),
-    setup_packet_in_measurements(),
+    setup_histograms(),
     {ok, #state{times = ets:new(times, [])}}.
 
 handle_call(_Request, _From, State) ->
@@ -75,6 +78,9 @@ handle_cast({packet_in_handled, Key, T2}, #state{times = Times} = State) ->
     DiffMicro = timer:now_diff(T2, ets:lookup_element(Times, Key, 2)),
     update_metric(?CTRL_HANDLE_PKT_IN, DiffMicro),
     ets:delete(Times, Key),
+    {noreply, State};
+handle_cast({fwd_table_size, Size}, State) ->
+    exometer:update([fwd_table_size], Size),
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -94,7 +100,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-setup_packet_in_measurements() ->
+setup_histograms() ->
     [begin
          Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
          %% histogram reports min, max, mean of values stored during a
@@ -108,7 +114,11 @@ setup_packet_in_measurements() ->
          ok = exometer:new(M, histogram, [Opts]),
          ok = exometer_report:subscribe(exometer_report_lager, M, [mean],
                                         _ReportInterval = ?SEC_TO_MILI(10))
-     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN]].
+     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN]],
+    ok = exometer:new(M = [fwd_table_size], histogram,
+                      [report_values_aggregated_during_period(?SEC_TO_MILI(60))]),
+    ok = exometer_report:subscribe(exometer_report_lager, M, [mean, min, max],
+                                   _ReportInterval = ?SEC_TO_MILI(10)).
 
 setup_counters() ->
     [begin

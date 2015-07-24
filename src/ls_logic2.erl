@@ -79,7 +79,14 @@ handle_cast(_Request, State) ->
 
 handle_info(timeout, #state{datapath_id = DatapathId} = State) ->
     ok = ofs_handler:subscribe(DatapathId, ls_ofsh2, packet_in),
-    {noreply, State}.
+    {noreply, State};
+handle_info({remove_forwarding_entry, _, SrcMac},
+            #state{datapath_id = DatapathId, fwd_table = FwdTable0} = State) ->
+    FwdTable1 = ls_logic_common:remove_forwarding_entry(SrcMac, FwdTable0),
+    lager:debug([{ls, x}], "[~p][del_entry] Removed fwd entry for ~p",
+                [DatapathId, SrcMac]),
+    {noreply, State#state{fwd_table = FwdTable1}}.
+
 
 terminate(_Reason, #state{datapath_id = DatapathId}) ->
     case ofs_handler:unsubscribe(DatapathId, ls_ofsh2, packet_in) of
