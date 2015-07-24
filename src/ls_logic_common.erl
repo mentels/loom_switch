@@ -1,6 +1,7 @@
 -module(ls_logic_common).
 
--export([handle_packet_in/6]).
+-export([handle_packet_in/6,
+         remove_forwarding_entry/2]).
 
 -include_lib("of_protocol/include/of_protocol.hrl").
 
@@ -35,6 +36,7 @@ learn_src_mac_to_port(DatapathId, PacketIn, FwdTable0) ->
             FwdTable0;
         _ ->
             FwdTable1 = maps:put(SrcMac, InPort, FwdTable0),
+            schedule_removing_entry(DatapathId, SrcMac),
             lager:debug([{ls, x}], "[~p][pkt_in] Added entry to fwd table: ~p -> ~p ~n",
                         [DatapathId, format_mac(SrcMac), InPort]),
             FwdTable1
@@ -94,3 +96,11 @@ update_handle_packet_in_metric(T1) ->
 
 get_opt(O, Opts) ->
     proplists:get_value(O, Opts).
+
+remove_forwarding_entry(SrcMac, FwdTable) ->
+    ls_metrics:update_fwd_table_size(maps:size(FwdTable)),
+    maps:remove(SrcMac, FwdTable).
+
+schedule_removing_entry(DatapathId, SrcMac) ->
+    {ok, _Tref} = timer:send_after(
+                    1000 * 30, {remove_forwarding_entry, DatapathId, SrcMac}).

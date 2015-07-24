@@ -121,6 +121,21 @@ handle_cast({clear_forwarding_table, DatapathId},
              State#state{switches = maps:put(DatapathId, #{}, Switches)}}
     end.
 
+handle_info({remove_forwarding_entry, DatapathId, SrcMac},
+            #state{switches = Switches} = State) ->
+    case maps:find(DatapathId, Switches) of
+        error ->
+            lager:debug([{ls, x}], "[~p][del_entry] Failure: not connected~n",
+                        [DatapathId]),
+            {noreply, State};
+        {ok, FwdTable0}  ->
+            lager:debug([{ls, x}], "[~p][del_entry] Remove entry for ~p",
+                        [DatapathId, SrcMac]),
+            FwdTable1 = ls_logic_common:remove_forwarding_entry(SrcMac,
+                                                                FwdTable0),
+            {noreply,
+             State#state{switches = maps:put(DatapathId, FwdTable1, Switches)}}
+    end;
 handle_info(_Info, State) ->
     {noreply, State}.
 

@@ -1,4 +1,4 @@
-:name "loom_switch"
+:name "loom_switch_edts"
 :node-sname "loom_switch_edts"
 :lib-dirs '("deps")
 :app-include-dirs '("include")
