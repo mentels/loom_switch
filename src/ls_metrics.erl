@@ -101,36 +101,34 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 setup_histograms() ->
+    Timespan = application:get_env(ls,
+                                   histogram_time_span_in_micros,
+                                   ?SEC_TO_MILI(60)),
+    Opts = report_values_aggregated_during_period(Timespan),
     [begin
-         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
          %% histogram reports min, max, mean of values stored during a
-         %% given timestamp. By deafault it also aggretates mean, max, min
+         %% given time span. By deafault it also aggretates mean, max, min
          %% in a time slot ({slot_period, MILIS} option). So if time span is
          %% 60s and slot_period is 10s, histogram will return a mean of 10
          %% slot periods
          %% provided datapoints:
          %% max, min, mean, median, percentiles, number of values used in
          %% calculation
-         ok = exometer:new(M, histogram, [Opts]),
-         ok = exometer_report:subscribe(exometer_report_lager, M, [mean],
-                                        _ReportInterval = ?SEC_TO_MILI(10))
-     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN]],
-    ok = exometer:new(M = [fwd_table_size], histogram,
-                      [report_values_aggregated_during_period(?SEC_TO_MILI(60))]),
-    ok = exometer_report:subscribe(exometer_report_lager, M, [mean, min, max],
-                                   _ReportInterval = ?SEC_TO_MILI(10)).
+         ok = exometer:new(M, histogram, [Opts])
+     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN, [fwd_table_size]]].
 
 setup_counters() ->
+    Timespan = application:get_env(ls,
+                                   counter_time_span_in_micros,
+                                   ?SEC_TO_MILI(60)),
+    Opts = report_values_aggregated_during_period(Timespan),
     [begin
-         Opts = report_values_aggregated_during_period(?SEC_TO_MILI(60)),
          %% spiral is based on histogram but it returns a _sum_ of all
          %% values provided during a time span
          %% it prvides two datapoints:
          %% one - all values summed during a time span
          %% count - sum of ALL values
-         ok = exometer:new([T], spiral, [Opts]),
-         ok = exometer_report:subscribe(exometer_report_lager, [T], [one, count],
-                                        _ReportInterval = ?SEC_TO_MILI(10))
+         ok = exometer:new([T], spiral, [Opts])
      end || T <- [flow_mod, packet_in, packet_out]].
 
 update_metric(Metric, DiffMicro) ->
