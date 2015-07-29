@@ -14,6 +14,7 @@
             - [/etc/network/interfaces](#etcnetworkinterfaces)
             - [/etc/hosts](#etchosts)
             - [/etc/hostname](#etchostname)
+            - [/etc/sudoers](#etcsudoers)
         - [/etc/ssh/sshd_config](#etcsshsshdconfig)
             - [route -n](#route--n)
             - [ip addr show](#ip-addr-show)
@@ -118,6 +119,10 @@ netmask 255.255.255.0
 ```bash
 mn1
 ```
+
+### /etc/sudoers
+
+mininet_user ALL = NOPASSWD: ALL
 
 ### /etc/ssh/sshd_config
 
