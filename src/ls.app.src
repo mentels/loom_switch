@@ -9,7 +9,8 @@
                   of_msg_lib,
                   ofs_handler,
                   of_driver,
-                  exometer
+                  exometer,
+                  uuid
                  ]},
   {mod, { ls_app, []}},
   {env, []}

@@ -66,9 +66,9 @@ install_flow_to_dst_mac(PacketIn, OutPort, DatapathId, Opts) ->
     ok = ls_ctrl_client:send(DatapathId, FlowMod).
 
 send_packet_out(DatapathId, Xid, PacketIn, OutPort) ->
-    [InPort, BufferId] = packet_in_extract([in_port, buffer_id], PacketIn),
     Actions = [{output, OutPort, no_buffer}],
-    PacketOut = of_msg_lib:send_packet(4, BufferId, InPort, Actions),
+    BufferId = packet_in_extract(buffer_id, PacketIn),
+    PacketOut = construct_packet_out(BufferId, PacketIn, Actions),
     ok = exometer:update([packet_out], 1),
     ok = ls_ctrl_client:send(DatapathId, PacketOut#ofp_message{xid = Xid}).
 
@@ -84,7 +84,16 @@ packet_in_extract(in_port, PacketIn) ->
     <<InPort:32>> = proplists:get_value(in_port, proplists:get_value(match, PacketIn)),
     InPort;
 packet_in_extract(buffer_id, PacketIn) ->
-    proplists:get_value(buffer_id, PacketIn).
+    proplists:get_value(buffer_id, PacketIn);
+packet_in_extract(data, PacketIn) ->
+    proplists:get_value(data, PacketIn).
+
+construct_packet_out(no_buffer, PacketIn, Actions) ->
+    [InPort, Data] = packet_in_extract([in_port, data], PacketIn),
+    of_msg_lib:send_packet(4, Data, InPort, Actions);
+construct_packet_out(BufferId, PacketIn, Actions) when is_integer(BufferId)->
+    InPort = packet_in_extract(in_port, PacketIn),
+    of_msg_lib:send_packet(4, BufferId, InPort, Actions).
 
 format_mac(MacBin) ->
     Mac0 = [":" ++ integer_to_list(X, 16) || <<X>> <= MacBin],

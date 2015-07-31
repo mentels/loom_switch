@@ -35,26 +35,25 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-handle_packet_in(SwitchId,
-                 #ofp_message{xid= Xid, type = packet_in, body = PacketIn}) ->
-    #ofp_packet_in{buffer_id = BufferId} = PacketIn,
-    Key = {SwitchId, Xid, BufferId},
+handle_packet_in(_SwitchId, #ofp_message{type = packet_in} = Msg) ->
+    Key = uuid:uuid4(),
     lager:debug("Saving timestamp for ~p", [Key]),
-    gen_server:cast(?SERVER, {packet_in_arrived, Key, os:timestamp()});
-handle_packet_in(_, _) ->
-    ok.
+    gen_server:cast(?SERVER, {packet_in_arrived, Key, os:timestamp()}),
+    Msg#ofp_message{xid = Key};
+handle_packet_in(_, Msg) ->
+    Msg.
 
 update_fwd_table_size(Size) ->
     gen_server:cast(?SERVER, {fwd_table_size, Size}).
 
-handle_packet_out(SwitchId, #ofp_message{xid = Xid, body = PacketOut})
+handle_packet_out(_SwitchId, #ofp_message{xid = Xid, body = PacketOut} = Msg)
   when element(1, PacketOut) =:= ofp_packet_out ->
-    #ofp_packet_out{buffer_id = BufferId} = PacketOut,
-    Key = {SwitchId, Xid, BufferId},
+    Key = Xid,
     lager:debug("Calculating timestamp for ~p", [Key]),
-    gen_server:cast(?SERVER, {packet_in_handled, Key, os:timestamp()});
-handle_packet_out(_, _) ->
-    ok.
+    gen_server:cast(?SERVER, {packet_in_handled, Key, os:timestamp()}),
+    Msg#ofp_message{xid = 0};
+handle_packet_out(_, Msg) ->
+    Msg.
 
 %%%===================================================================
 %%% gen_server callbacks
