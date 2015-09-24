@@ -40,6 +40,7 @@ init([]) ->
                        [?CHILD(ls_logic2_sup, Opts, supervisor)
                         | BasicChildren];
                    regular = Mode ->
+                       application:set_env(ofs_handler, callback_module, ls_ofsh),
                        [?CHILD(ls_logic, Opts, worker) | BasicChildren]
                end,
     {ok, {{one_for_one, 5, 10}, Children}}.
