@@ -6,6 +6,7 @@
   {applications, [
                   kernel,
                   stdlib,
+                  os_mon,
                   of_msg_lib,
                   ofs_handler,
                   of_driver,

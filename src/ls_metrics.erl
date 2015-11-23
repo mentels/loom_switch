@@ -18,9 +18,14 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+%% CPU and Memory monitoring
+-export([cpu_utilization/0, mem_utilization/0]).
+
 -define(SERVER, ?MODULE).
 -define(CTRL_HANDLE_PKT_IN, [controller_handle_packet_in]).
 -define(APP_HANDLE_PKT_IN, [app_handle_packet_in]).
+-define(CPU, [cpu_avg]).
+-define(MEM, [memory]).
 -define(SEC_TO_MILI(X), X * 1000).
 
 -record(state, {times :: ets:tid()}).
@@ -62,6 +67,7 @@ handle_packet_out(_, Msg) ->
 init([]) ->
     process_flag(trap_exit, true),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
+    initialize_cpu_and_memory_monitoring(),
     setup_counters(),
     setup_histograms(),
     {ok, #state{times = ets:new(times, [])}}.
@@ -104,7 +110,8 @@ setup_histograms() ->
                                    histogram_time_span_in_micros,
                                    ?SEC_TO_MILI(60)),
     Opts = report_values_aggregated_during_period(Timespan),
-    [begin
+    [
+     begin
          %% histogram reports min, max, mean of values stored during a
          %% given time span. By deafault it also aggretates mean, max, min
          %% in a time slot ({slot_period, MILIS} option). So if time span is
@@ -114,7 +121,14 @@ setup_histograms() ->
          %% max, min, mean, median, percentiles, number of values used in
          %% calculation
          ok = exometer:new(M, histogram, [Opts])
-     end || M <- [?CTRL_HANDLE_PKT_IN, ?APP_HANDLE_PKT_IN, [fwd_table_size]]].
+     end || M <- [
+                  ?CTRL_HANDLE_PKT_IN,
+                  ?APP_HANDLE_PKT_IN,
+                  [fwd_table_size],
+                  ?CPU,
+                  ?MEM
+                 ]
+    ].
 
 setup_counters() ->
     Timespan = application:get_env(ls,
@@ -135,3 +149,33 @@ update_metric(Metric, DiffMicro) ->
 
 report_values_aggregated_during_period(Micros) ->
     {time_span, Micros}.
+
+initialize_cpu_and_memory_monitoring() ->
+    CpuInterval = application:get_env(
+                    ls,
+                    cpu_utilization_check_interval,
+                    ?SEC_TO_MILI(60)),
+    MemInterval = application:get_env(
+                    ls,
+                    memory_utilization_check_interval,
+                    ?SEC_TO_MILI(60)),
+    {ok, _Ref1} = timer:apply_interval(CpuInterval, ?MODULE, cpu_utilization, []),
+    {ok, _Ref2} = timer:apply_interval(MemInterval, ?MODULE, mem_utilization, []).
+
+cpu_utilization() ->
+    {all, BusyAvg, _, _} = cpu_sup:util([]),
+    ok = exometer:update(?CPU, BusyAvg).
+
+mem_utilization() ->
+    {_Total, AllocatedInBytes, _Worst} = memsup:get_memory_data(),
+    ok = exometer:update(?MEM, AllocatedInBytes).
+
+
+
+
+
+
+
+
+
+
