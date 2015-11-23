@@ -164,7 +164,7 @@ initialize_cpu_and_memory_monitoring() ->
 
 cpu_utilization() ->
     {all, BusyAvg, _, _} = cpu_sup:util([]),
-    ok = exometer:update(?CPU, BusyAvg).
+    ok = exometer:update(?CPU, round(BusyAvg)).
 
 mem_utilization() ->
     {_Total, AllocatedInBytes, _Worst} = memsup:get_memory_data(),
