@@ -67,10 +67,9 @@ handle_packet_out(_, Msg) ->
 init([]) ->
     process_flag(trap_exit, true),
     ok = exometer_report:add_reporter(exometer_report_lager, []),
-    initialize_cpu_and_memory_monitoring(),
     setup_counters(),
     setup_histograms(),
-    {ok, #state{times = ets:new(times, [])}}.
+    {ok, #state{times = ets:new(times, [])}, 0}.
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -90,6 +89,15 @@ handle_cast({fwd_table_size, Size}, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info(timeout, State) ->
+    initialize_cpu_and_memory_monitoring(),
+    {noreply, State};
+handle_info(cpu_utilization, State) ->
+    cpu_utilization(),
+    {noreply, State};
+handle_info(mem_utilization, State) ->
+    mem_utilization(),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -159,8 +167,8 @@ initialize_cpu_and_memory_monitoring() ->
                     ls,
                     memory_utilization_check_interval,
                     ?SEC_TO_MILI(60)),
-    {ok, _Ref1} = timer:apply_interval(CpuInterval, ?MODULE, cpu_utilization, []),
-    {ok, _Ref2} = timer:apply_interval(MemInterval, ?MODULE, mem_utilization, []).
+    {ok, _} = timer:send_interval(CpuInterval, cpu_utilization),
+    {ok, _} = timer:send_interval(MemInterval, mem_utilization).
 
 cpu_utilization() ->
     {all, BusyAvg, _, _} = cpu_sup:util([]),
